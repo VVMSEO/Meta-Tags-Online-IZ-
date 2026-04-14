@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: projects
+    // Document ID: {projectId}
+    // Fields:
+    //   - uid: string (required) - Owner ID
+    //   - name: string (required, max 100 chars) - Project name
+    //   - phrases: string (optional, max 5000 chars) - Key phrases
+    //   - title: string (optional, max 500 chars) - Meta title
+    //   - description: string (optional, max 2000 chars) - Meta description
+    //   - h1: string (optional, max 500 chars) - Meta H1
+    //   - link: string (optional, max 500 chars) - Link
+    //   - deletedWords: list (optional) - Deleted words
+    //   - createdAt: timestamp (required, immutable) - Creation time
+    //   - updatedAt: timestamp (required) - Last update time
+    //
+    // Collection: userSettings
+    // Document ID: {uid} (matches user ID)
+    // Fields:
+    //   - uid: string (required) - Owner ID
+    //   - stopWords: string (optional, max 2000 chars) - Stop words
+    //   - limits: map (optional) - Limits object
+    //   - updatedAt: timestamp (optional) - Last update time
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+    function isValidList(list, maxSize) {
+      return list is list && list.size() <= maxSize;
+    }
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidProject(data) {
+      return hasOnlyAllowedFields(['uid', 'name', 'phrases', 'title', 'description', 'h1', 'link', 'deletedWords', 'createdAt', 'updatedAt']) &&
+             hasRequiredFields(['uid', 'name', 'createdAt', 'updatedAt']) &&
+             validStringLength('name', 1, 100) &&
+             isValidOptionalString('phrases', 0, 5000) &&
+             isValidOptionalString('title', 0, 500) &&
+             isValidOptionalString('description', 0, 2000) &&
+             isValidOptionalString('h1', 0, 500) &&
+             isValidOptionalString('link', 0, 500) &&
+             (!( 'deletedWords' in data ) || isValidList(data.deletedWords, 1000)) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    function isValidUserSettings(data) {
+      return hasOnlyAllowedFields(['uid', 'stopWords', 'limits', 'updatedAt']) &&
+             hasRequiredFields(['uid']) &&
+             isValidOptionalString('stopWords', 0, 2000) &&
+             (!( 'limits' in data ) || data.limits is map) &&
+             (!( 'updatedAt' in data ) || data.updatedAt is timestamp);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isDocOwner();
+      allow create: if isAuthenticated() && 
+                    uidUnchanged() && 
+                    isValidProject(request.resource.data);
+      allow update: if isDocOwner() && 
+                    uidNotModified() && 
+                    areImmutableFieldsUnchanged(['createdAt']) &&
+                    isValidProject(request.resource.data);
+      allow delete: if isDocOwner();
+    }
+
+    match /userSettings/{settingId} {
+      allow read: if isOwner(settingId);
+      allow create: if isOwner(settingId) && 
+                    uidUnchanged() && 
+                    isValidUserSettings(request.resource.data);
+      allow update: if isOwner(settingId) && 
+                    uidNotModified() && 
+                    isValidUserSettings(request.resource.data);
+      allow delete: if isOwner(settingId);
+    }
+  }
+}

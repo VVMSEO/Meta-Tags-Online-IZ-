@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "A saved meta-tag project",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user ID of the owner"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the project"
+        },
+        "phrases": {
+          "type": "string",
+          "description": "The key phrases"
+        },
+        "title": {
+          "type": "string",
+          "description": "The generated or written title"
+        },
+        "description": {
+          "type": "string",
+          "description": "The generated or written description"
+        },
+        "h1": {
+          "type": "string",
+          "description": "The generated or written H1"
+        },
+        "link": {
+          "type": "string",
+          "description": "The link for the snippet"
+        },
+        "deletedWords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Words deleted from analysis"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "When the project was created"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "When the project was last updated"
+        }
+      },
+      "required": ["uid", "name", "createdAt", "updatedAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User specific settings for limits and stop words",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user ID"
+        },
+        "stopWords": {
+          "type": "string",
+          "description": "Custom stop words"
+        },
+        "limits": {
+          "type": "object",
+          "description": "Limits for meta tags"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "When the settings were last updated"
+        }
+      },
+      "required": ["uid"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/Project"
+      },
+      "description": "Stores user projects"
+    },
+    "/userSettings/{settingId}": {
+      "schema": {
+        "$ref": "#/entities/UserSettings"
+      },
+      "description": "Stores user settings"
+    }
+  }
+}
